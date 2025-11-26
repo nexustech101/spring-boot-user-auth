@@ -17,7 +17,7 @@ import org.hibernate.annotations.UpdateTimestamp;
  * Includes fields for id, username, password, email, createdAt, and updatedAt.
  * Uses JPA annotations for ORM mapping and Hibernate annotations for automatic timestamping.
  * 
- * @author Charles DeFreese III (cdefre3@wgu.edu)
+ * @author (cdefre3@wgu.edu)
  * @version 1.0.0
  */
 @Entity

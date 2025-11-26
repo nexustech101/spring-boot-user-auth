@@ -230,3 +230,7 @@ Authorization: Bearer <JWT token>
 - Project Lombok - Java library that helps to reduce boilerplate code
 - Auth0 Java JWT - Library for working with JSON Web Tokens (JWT) in Java
 - Flyway - Database migration tool for java
+
+### Author
+
+- cdefre3@wgu.edu
