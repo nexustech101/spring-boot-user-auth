@@ -6,3 +6,7 @@ services:
       - "6379:6379"
     networks:
       - simple-auth-network
+
+networks:
+  simple-auth-network:
+    driver: bridge
