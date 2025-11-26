@@ -5,8 +5,15 @@ import com.example.auth.repository.UserRepository;
 import com.example.auth.dto.SigninRequest;
 import com.example.auth.utils.InputSanitizer;
 
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.cache.annotation.EnableCaching;
+
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+
 import org.springframework.stereotype.Service;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -18,9 +25,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
 
+@EnableCaching
 @Service
 public class UserService {
-    
     private final UserRepository repository;
     private final BCryptPasswordEncoder passwordEncoder;
     private static final Logger logger = LoggerFactory.getLogger(UserService.class);
@@ -37,20 +44,29 @@ public class UserService {
         return this.repository.findAll(pageable);
     }
 
+    // Reads (Redis)
+    @Cacheable(cacheNames = "usersById", key = "#id", unless = "#result == null")
     public Optional<User> getUserById(Long id) {
         return this.repository.findById(id);
     }
 
+    @Cacheable(cacheNames = "usersByUsername", key = "#username", unless = "#result == null")
     public Optional<User> findByUsername(String username) {
         logger.debug("Finding user by username={}", username);
         return this.repository.findByUsername(username);
     }
 
+    @Cacheable(cacheNames = "usersByEmail", key = "#email", unless = "#result == null")
     public Optional<User> findByEmail(String email) {
         logger.debug("Finding user by email={}", email);
         return this.repository.findByEmail(email);
     }
 
+    @Caching(evict = {
+        @CacheEvict(cacheNames = "usersById", key = "#result.id", condition = "#result != null"),
+        @CacheEvict(cacheNames = "usersByUsername", key = "#result.username", condition = "#result != null"),
+        @CacheEvict(cacheNames = "usersByEmail", key = "#result.email", condition = "#result != null")
+    })
     public Page<User> findByName(String name, Pageable pageable) {
         logger.debug("Finding paginated users by name pattern={} with page={}, size={}", name, pageable.getPageNumber(), pageable.getPageSize());
         return this.repository.findByName(name, pageable);
@@ -64,6 +80,12 @@ public class UserService {
         return this.repository.existsByEmail(email);
     }
 
+    // Writes — evict affected entries (Redis)
+    @Caching(evict = {
+        @CacheEvict(cacheNames = "usersById", key = "#result.id", condition = "#result != null"),
+        @CacheEvict(cacheNames = "usersByUsername", key = "#result.username", condition = "#result != null"),
+        @CacheEvict(cacheNames = "usersByEmail", key = "#result.email", condition = "#result != null")
+    })
     public User createUser(User user) {
         logger.info("Creating user username={}", user.getUsername());
         user.setPassword(passwordEncoder.encode(user.getPassword()));
@@ -72,6 +94,11 @@ public class UserService {
         return saved;
     }
 
+    @Caching(evict = {
+        @CacheEvict(cacheNames = "usersById", key = "#id"),
+        @CacheEvict(cacheNames = "usersByUsername", allEntries = true),
+        @CacheEvict(cacheNames = "usersByEmail", allEntries = true)
+    })
     public User updateUserEmail(Long id, String newEmail) {
         logger.info("Updating email for user id={} to {}", id, newEmail);
         return this.repository.findById(id).map(user -> {
@@ -83,6 +110,10 @@ public class UserService {
         .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + id));
     }
 
+    @Caching(evict = {
+        @CacheEvict(cacheNames = "usersById", key = "#id"),
+        @CacheEvict(cacheNames = "usersByUsername", allEntries = true)
+    })
     public User updatePassword(Long id, String newPassword) {
         logger.info("Updating password for user id={}", id);
         return this.repository.findById(id).map(user -> {
@@ -94,6 +125,11 @@ public class UserService {
         .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + id));
     }
 
+    @Caching(evict = {
+        @CacheEvict(cacheNames = "usersById", key = "#id"),
+        @CacheEvict(cacheNames = "usersByUsername", allEntries = true),
+        @CacheEvict(cacheNames = "usersByEmail", allEntries = true)
+    })
     public void deleteUser(Long id) {
         logger.info("Deleting user id={}", id);
         Optional<User> userOpt = this.repository.findById(id);
@@ -136,6 +172,11 @@ public class UserService {
 
     // Persistant authentication methods
 
+    @Caching(evict = {
+        @CacheEvict(cacheNames = "usersById", key = "#result.id", condition = "#result != null"),
+        @CacheEvict(cacheNames = "usersByUsername", key = "#result.username", condition = "#result != null"),
+        @CacheEvict(cacheNames = "usersByEmail", key = "#result.email", condition = "#result != null")
+    })
     public User signup(User user) {
         logger.info("Attempting signup for username={}", user.getUsername());
         
