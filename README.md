@@ -32,7 +32,7 @@ To ensure you have the required build tools, please install the following packag
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/your-username/spring-boot-user-auth.git
+git clone https://github.com/nexustech101/spring-boot-user-auth.git
 ```
 
 2. Navigate into the project directory:
