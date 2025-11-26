@@ -1,4 +1,4 @@
-package com.example.auth.Config;
+package com.example.auth.config;
 
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
