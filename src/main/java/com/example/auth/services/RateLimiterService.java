@@ -11,8 +11,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Rate limiting service using Guava to limit login attempts.
- * Default: 3 attempts per 10 minutes per username.
+ * In-memory rate limiting service using Guava.
+ * Limits login attempts to 3 per 10 minutes per username.
+ * Uses token bucket algorithm with automatic cache cleanup.
  */
 @SuppressWarnings("NullableProblems")
 @Service
@@ -34,10 +35,11 @@ public class RateLimiterService {
     }
 
     /**
-     * Check if the user has exceeded the rate limit.
+     * Checks if a login attempt is allowed.
+     * Fails open (allows request) on cache errors.
      *
      * @param username the username to rate limit
-     * @return true if request is allowed, false if rate limit exceeded
+     * @return true if allowed, false if rate limit exceeded
      */
     public boolean isAllowed(@javax.annotation.Nonnull String username) {
         try {
@@ -50,10 +52,10 @@ public class RateLimiterService {
     }
 
     /**
-     * Get remaining attempts for the user.
+     * Gets remaining attempts for a user (approximate).
      *
      * @param username the username to check
-     * @return remaining attempts (approximate, up to 3)
+     * @return estimated remaining attempts (0-3)
      */
     public int getRemainingAttempts(@javax.annotation.Nonnull String username) {
         try {

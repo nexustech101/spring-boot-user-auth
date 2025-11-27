@@ -56,7 +56,7 @@ public class UserController {
     @GetMapping
     public ResponseEntity<?> getAllUsers(
         @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "10") int size,
+        @RequestParam(defaultValue = "50") int size,
         @RequestParam(defaultValue = "id") String sortBy
     ) {
         logger.debug("GET /api/v1/users - getAllUsers called with page={}, size={}", page, size);

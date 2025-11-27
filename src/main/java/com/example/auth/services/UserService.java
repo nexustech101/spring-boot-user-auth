@@ -25,6 +25,11 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
 
+/**
+ * Service for user management and authentication.
+ * Implements Redis caching with separate regions for ID, username, and email lookups.
+ * Passwords are encrypted using BCrypt.
+ */
 @EnableCaching
 @Service
 public class UserService {
@@ -39,29 +44,63 @@ public class UserService {
 
     // CRUD Methods
 
+    /**
+     * Retrieves all users with pagination.
+     *
+     * @param pageable pagination parameters
+     * @return page of users
+     */
     public Page<User> getAllUsers(Pageable pageable) {
         logger.debug("Fetching paginated users with page={}, size={}", pageable.getPageNumber(), pageable.getPageSize());
         return this.repository.findAll(pageable);
     }
 
     // Reads (Redis)
+    /**
+     * Retrieves a user by ID.
+     * Cached in 'usersById' region with 5-minute TTL.
+     *
+     * @param id the user ID
+     * @return Optional containing the user if found
+     */
     @Cacheable(cacheNames = "usersById", key = "#id", unless = "#result == null")
     public Optional<User> getUserById(Long id) {
         return this.repository.findById(id);
     }
 
+    /**
+     * Finds a user by username.
+     * Cached in 'usersByUsername' region with 10-minute TTL.
+     *
+     * @param username the username
+     * @return Optional containing the user if found
+     */
     @Cacheable(cacheNames = "usersByUsername", key = "#username", unless = "#result == null")
     public Optional<User> findByUsername(String username) {
         logger.debug("Finding user by username={}", username);
         return this.repository.findByUsername(username);
     }
 
+    /**
+     * Finds a user by email.
+     * Cached in 'usersByEmail' region with 10-minute TTL.
+     *
+     * @param email the email address
+     * @return Optional containing the user if found
+     */
     @Cacheable(cacheNames = "usersByEmail", key = "#email", unless = "#result == null")
     public Optional<User> findByEmail(String email) {
         logger.debug("Finding user by email={}", email);
         return this.repository.findByEmail(email);
     }
 
+    /**
+     * Searches for users by name pattern with pagination.
+     *
+     * @param name the name pattern
+     * @param pageable pagination parameters
+     * @return page of matching users
+     */
     @Caching(evict = {
         @CacheEvict(cacheNames = "usersById", key = "#result.id", condition = "#result != null"),
         @CacheEvict(cacheNames = "usersByUsername", key = "#result.username", condition = "#result != null"),
@@ -72,15 +111,34 @@ public class UserService {
         return this.repository.findByName(name, pageable);
     }
 
+    /**
+     * Checks if a username exists.
+     *
+     * @param username the username to check
+     * @return true if exists
+     */
     public boolean existsByUsername(String username) {
         return this.repository.existsByUsername(username);
     }
     
+    /**
+     * Checks if an email exists.
+     *
+     * @param email the email to check
+     * @return true if exists
+     */
     public boolean existsByEmail(String email) {
         return this.repository.existsByEmail(email);
     }
 
     // Writes — evict affected entries (Redis)
+    /**
+     * Creates a new user.
+     * Password is automatically encrypted with BCrypt.
+     *
+     * @param user the user to create
+     * @return the created user
+     */
     @Caching(evict = {
         @CacheEvict(cacheNames = "usersById", key = "#result.id", condition = "#result != null"),
         @CacheEvict(cacheNames = "usersByUsername", key = "#result.username", condition = "#result != null"),
@@ -94,6 +152,14 @@ public class UserService {
         return saved;
     }
 
+    /**
+     * Updates a user's email address.
+     *
+     * @param id the user ID
+     * @param newEmail the new email
+     * @return the updated user
+     * @throws ResourceNotFoundException if user not found
+     */
     @Caching(evict = {
         @CacheEvict(cacheNames = "usersById", key = "#id"),
         @CacheEvict(cacheNames = "usersByUsername", allEntries = true),
@@ -110,6 +176,15 @@ public class UserService {
         .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + id));
     }
 
+    /**
+     * Updates a user's password.
+     * Password is automatically encrypted with BCrypt.
+     *
+     * @param id the user ID
+     * @param newPassword the new password
+     * @return the updated user
+     * @throws ResourceNotFoundException if user not found
+     */
     @Caching(evict = {
         @CacheEvict(cacheNames = "usersById", key = "#id"),
         @CacheEvict(cacheNames = "usersByUsername", allEntries = true)
@@ -125,6 +200,11 @@ public class UserService {
         .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + id));
     }
 
+    /**
+     * Deletes a user by ID.
+     *
+     * @param id the user ID to delete
+     */
     @Caching(evict = {
         @CacheEvict(cacheNames = "usersById", key = "#id"),
         @CacheEvict(cacheNames = "usersByUsername", allEntries = true),
@@ -142,12 +222,26 @@ public class UserService {
         return; // Explicitly return to indicate completion
     }
 
+    /**
+     * Checks if a raw password matches an encoded password.
+     *
+     * @param rawPassword the plain-text password
+     * @param encodedPassword the BCrypt-encoded password
+     * @return true if passwords match
+     */
     public boolean checkPassword(String rawPassword, String encodedPassword) {
         boolean ok = this.passwordEncoder.matches(rawPassword, encodedPassword);
         logger.debug("Password match result={}", ok);
         return ok;
     }
 
+    /**
+     * Validates if a password is correct for a user.
+     *
+     * @param id the user ID
+     * @param rawPassword the password to validate
+     * @return true if password is correct
+     */
     public boolean isValidPassword(Long id, String rawPassword) {
         Optional<User> userOpt = this.repository.findById(id);
         if (userOpt.isPresent()) {
@@ -159,6 +253,13 @@ public class UserService {
         return false;
     }
 
+    /**
+     * Validates if an email matches a user's email.
+     *
+     * @param id the user ID
+     * @param email the email to validate
+     * @return true if email matches
+     */
     public boolean isValidEmail(Long id, String email) {
         Optional<User> userOpt = this.repository.findById(id);
         if (userOpt.isPresent()) {
@@ -172,6 +273,14 @@ public class UserService {
 
     // Persistant authentication methods
 
+    /**
+     * Registers a new user with input sanitization.
+     * Sanitizes username and email, encrypts password with BCrypt.
+     *
+     * @param user the user to register
+     * @return the created user
+     * @throws BadRequestException if input is unsafe
+     */
     @Caching(evict = {
         @CacheEvict(cacheNames = "usersById", key = "#result.id", condition = "#result != null"),
         @CacheEvict(cacheNames = "usersByUsername", key = "#result.username", condition = "#result != null"),
@@ -206,6 +315,13 @@ public class UserService {
     }
 
     // Authentication user
+    /**
+     * Authenticates a user by username or email.
+     * Supports both username and email as identifier.
+     *
+     * @param signinRequest contains username/email and password
+     * @return Optional containing the user if authenticated
+     */
     public Optional<User> signin(SigninRequest signinRequest) {
         logger.info("Signin attempt for identifier={}", signinRequest.getUsername());
         

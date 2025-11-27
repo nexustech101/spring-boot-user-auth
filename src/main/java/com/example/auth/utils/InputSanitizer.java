@@ -9,8 +9,8 @@ public class InputSanitizer {
      * Sanitize string by removing/escaping potentially dangerous characters.
      * Removes HTML/XML special characters.
      *
-     * @param input the input to sanitize
-     * @return sanitized input or null if input is null
+     * @param input the user input to be sanitized
+     * @return sanitized input or null
      */
     public static String sanitizeString(String input) {
         if (input == null) {
@@ -47,7 +47,7 @@ public class InputSanitizer {
             return null;
         }
         String cleaned = username.trim();
-        // Allow only alphanumeric, underscore, hyphen, dot
+        // Only allow alphanumeric, underscore, hyphen, dot
         return cleaned.replaceAll("[^a-zA-Z0-9._-]", "");
     }
 
@@ -66,7 +66,7 @@ public class InputSanitizer {
         if (password.length() < 8) {
             throw new IllegalArgumentException("Password must be at least 8 characters long");
         }
-        return password; // Don't sanitize passwords - let users use special chars
+        return password;
     }
 
     /**

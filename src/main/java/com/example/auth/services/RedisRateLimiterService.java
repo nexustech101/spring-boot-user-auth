@@ -4,6 +4,11 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import java.time.Duration;
 
+/**
+ * Distributed rate limiting service using Redis.
+ * Limits login attempts to 3 per 10 minutes per username.
+ * Shared state across multiple application instances.
+ */
 @Service
 public class RedisRateLimiterService {
     private final StringRedisTemplate redis;
@@ -14,6 +19,13 @@ public class RedisRateLimiterService {
         this.redis = redis;
     }
 
+    /**
+     * Checks if a login attempt is allowed using Redis counter.
+     * Atomically increments attempt counter with 10-minute TTL.
+     *
+     * @param username the username to rate limit
+     * @return true if allowed, false if rate limit exceeded
+     */
     public boolean isAllowed(String username) {
         String key = "rl:signin:" + username;
         Long count = redis.opsForValue().increment(key);
